@@ -72,7 +72,7 @@ Every layer has a single responsibility:
 - pnpm (or npm/yarn)
 - PostgreSQL database running locally or remotely
 
-### Installation
+### Installation (Local)
 
 ```bash
 # 1. Clone the repository
@@ -95,6 +95,22 @@ pnpm db:push
 # 6. Start the dev server
 pnpm dev
 ```
+
+### Running with Docker (Recommended)
+
+The easiest way to run the entire stack (App + Postgres + Redis) is using Docker Compose.
+
+```bash
+# 1. Start all services
+docker-compose up -d
+
+# 2. Run migrations and seed the database (first time only)
+docker-compose exec app pnpm db:push
+docker-compose exec app pnpm db:seed
+```
+
+The server will be available at [http://localhost:5000](http://localhost:5000) and Swagger at [http://localhost:5000/api-docs](http://localhost:5000/api-docs).
+The PostgreSQL database is exposed on port `5433` and Redis on `6380` for local tool access.
 
 The server will start at `http://localhost:5000`.
 To view Swagger API Documentation locally, visit: `http://localhost:5000/api-docs`.
