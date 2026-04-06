@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      Role     @default(VIEWER)
+  isActive  Boolean  @default(true)
+  records   Record[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Record {
+  id        String    @id @default(uuid())
+  amount    Float
+  type      RecordType
+  category  String
+  date      DateTime
+  notes     String?
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+}
+
+enum Role {
+  VIEWER
+  ANALYST
+  ADMIN
+}
+
+enum RecordType {
+  INCOME
+  EXPENSE
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String   // e.g., 'CREATE_RECORD', 'UPDATE_USER_ROLE'
+  entityType String   // e.g., 'Record', 'User'
+  entityId   String
+  payload    Json
+  userId     String   // The ID of the user performing the action
+  createdAt  DateTime @default(now())
+}
