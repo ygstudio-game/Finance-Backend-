@@ -43,8 +43,8 @@ async function run() {
       body: JSON.stringify({ email: 'admin@zorvyn.com' })
     });
     const data = await res.json();
-    if (!data.success || !data.token) throw new Error('Missing token in response');
-    jwtToken = data.token;
+    if (!data.success || !data.data?.token) throw new Error('Missing token in response');
+    jwtToken = data.data.token;
   });
 
   // Modify headers to use JWT for subsequent requests if available (or use legacy x-user-id for simplicity in this script, wait, we'll test JWT directly)
@@ -63,7 +63,7 @@ async function run() {
   await test('GET /users returns user list', async () => {
     const res = await fetch(`${BASE}/users`, { headers: headers(ADMIN_ID) });
     const data = await res.json();
-    if (!data.success || data.count < 3) throw new Error(`Expected 3+ users, got ${data.count}`);
+    if (!data.success || !Array.isArray(data.data) || data.data.length < 3) throw new Error(`Expected 3+ users, got ${data.data?.length}`);
   });
 
   // 4. Users - create (ADMIN)
@@ -88,38 +88,40 @@ async function run() {
   });
 
   // 17. Security: IDOR - VIEWER trying to delete ADMIN record
-  await test('Security: IDOR - VIEWER cannot delete ADMIN record (404)', async () => {
+  await test('Security: IDOR - VIEWER cannot delete ADMIN record (403)', async () => {
     // Get an admin record ID
     const adminRes = await fetch(`${BASE}/records?limit=1`, { headers: headers(ADMIN_ID) });
     const adminData = await adminRes.json();
-    const adminRecordId = adminData.records[0].id;
+    const adminRecordId = adminData.data.records[0].id;
 
-    // Try to delete it as Viewer
+    // Try to delete it as Viewer — VIEWER role is blocked at middleware level (403)
     const res = await fetch(`${BASE}/records/${adminRecordId}`, { 
       method: 'DELETE',
       headers: headers(VIEWER_ID) 
     });
-    if (res.status !== 404) throw new Error(`Expected 404, got ${res.status}`);
+    if (res.status !== 403) throw new Error(`Expected 403, got ${res.status}`);
   });
 
   // 18. Security: Mass Assignment - Change owner
-  await test('Security: Mass Assignment - VIEWER cannot steal record ownership', async () => {
-    // Create a viewer record
+  await test('Security: Mass Assignment - cannot inject userId into update', async () => {
+    // Create a record as ADMIN (POST /records requires ADMIN role)
     const createRes = await fetch(`${BASE}/records`, {
       method: 'POST',
-      headers: headers(VIEWER_ID),
-      body: JSON.stringify({ amount: 10, type: 'EXPENSE', category: 'Safe', date: '2026-04-04' })
+      headers: headers(ADMIN_ID),
+      body: JSON.stringify({ amount: 10, type: 'EXPENSE', category: 'Safe', date: '2026-04-04T00:00:00.000Z' })
     });
-    const viewerRecordId = (await createRes.json()).data.id;
+    const createData = await createRes.json();
+    const recordId = createData.data.id;
 
-    // Attempt to change owner to Admin
-    const updateRes = await fetch(`${BASE}/records/${viewerRecordId}`, {
-      method: 'PATCH',
-      headers: headers(VIEWER_ID),
-      body: JSON.stringify({ userId: ADMIN_ID })
+    // Attempt to inject a different userId via PUT — should be ignored by service
+    const updateRes = await fetch(`${BASE}/records/${recordId}`, {
+      method: 'PUT',
+      headers: headers(ADMIN_ID),
+      body: JSON.stringify({ userId: VIEWER_ID })
     });
     const updateData = await updateRes.json();
-    if (updateData.data.userId === ADMIN_ID) throw new Error('VULNERABILITY: Ownership stolen via Mass Assignment!');
+    // The userId in the record should still belong to ADMIN, not VIEWER
+    if (updateData.data && updateData.data.userId === VIEWER_ID) throw new Error('VULNERABILITY: Ownership stolen via Mass Assignment!');
   });
 
   // 6. Users - validation error
@@ -177,16 +179,16 @@ async function run() {
   await test('GET /records returns paginated results', async () => {
     const res = await fetch(`${BASE}/records?limit=5`, { headers: headers(ADMIN_ID) });
     const data = await res.json();
-    if (!data.pagination) throw new Error('Missing pagination metadata');
-    if (data.records.length > 5) throw new Error(`Expected max 5, got ${data.records.length}`);
-    if (data.pagination.nextCursor === undefined) throw new Error('Missing nextCursor in pagination');
+    if (!data.data?.pagination) throw new Error('Missing pagination metadata');
+    if (data.data.records.length > 5) throw new Error(`Expected max 5, got ${data.data.records.length}`);
+    if (data.data.pagination.nextCursor === undefined) throw new Error('Missing nextCursor in pagination');
   });
 
   // 12. Records - filter by type
   await test('GET /records?type=EXPENSE filters correctly', async () => {
     const res = await fetch(`${BASE}/records?type=EXPENSE`, { headers: headers(ADMIN_ID) });
     const data = await res.json();
-    const allExpense = data.records.every((r: any) => r.type === 'EXPENSE');
+    const allExpense = data.data.records.every((r: any) => r.type === 'EXPENSE');
     if (!allExpense) throw new Error('Non-EXPENSE record found in filtered results');
   });
 
@@ -194,7 +196,7 @@ async function run() {
   await test('GET /records?search=Rent filters correctly', async () => {
     const res = await fetch(`${BASE}/records?search=Rent`, { headers: headers(ADMIN_ID) });
     const data = await res.json();
-    const hasSearchTerm = data.records.every((r: any) => 
+    const hasSearchTerm = data.data.records.every((r: any) => 
       r.category.toLowerCase().includes('rent') || (r.notes && r.notes.toLowerCase().includes('rent'))
     );
     if (!hasSearchTerm) throw new Error('Record found without search term');

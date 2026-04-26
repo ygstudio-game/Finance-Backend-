@@ -45,10 +45,14 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
       return res.status(401).json({ success: false, error: 'Authentication required' });
     }
 
-    // Verify user in db (optional but good practice to ensure they are still active, even if JWT is valid)
-    const user = await prisma.user.findUnique({
-      where: { id: decodedUserId, isActive: true },
-    });
+    // Verify user in db using raw SQL
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT "id", "role" FROM "User"
+      WHERE "id" = ${decodedUserId} AND "isActive" = true
+      LIMIT 1
+    `;
+
+    const user = rows[0] || null;
 
     if (!user) {
       throw new ApiError(401, 'Invalid or inactive user');

@@ -14,15 +14,11 @@ export class AuditService {
     payload: any
   ) {
     try {
-      await prisma.auditLog.create({
-        data: {
-          userId,
-          action,
-          entityType,
-          entityId,
-          payload,
-        },
-      });
+      const jsonPayload = JSON.stringify(payload);
+      await prisma.$queryRaw`
+        INSERT INTO "AuditLog" ("id", "action", "entityType", "entityId", "payload", "userId", "createdAt")
+        VALUES (gen_random_uuid(), ${action}, ${entityType}, ${entityId}, ${jsonPayload}::jsonb, ${userId}, NOW())
+      `;
       logger.info({ audit: true, action, userId, entityId }, 'Audit log created');
     } catch (error) {
       // We don't necessarily want to fail the parent request if auditing fails occasionally,

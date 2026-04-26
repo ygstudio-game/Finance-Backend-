@@ -19,9 +19,13 @@ export class AuthController {
         throw new ApiError(400, 'Email is required');
       }
 
-      const user = await prisma.user.findUnique({
-        where: { email, isActive: true },
-      });
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT * FROM "User"
+        WHERE "email" = ${email} AND "isActive" = true
+        LIMIT 1
+      `;
+
+      const user = rows[0] || null;
 
       if (!user) {
         throw new ApiError(401, 'User not found or inactive');
