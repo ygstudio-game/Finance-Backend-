@@ -8,7 +8,8 @@ try {
   console.log('Successfully connected to the database');
 
   const server = app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+    console.log(`Server is running on${process.env.NODE_ENV === "development" ? ` http://localhost:${PORT}` : ` ${process.env.RENDER_EXTERNAL_URL}`}`);
+    console.log(`API Documentation is available at ${process.env.NODE_ENV === "development" ? ` http://localhost:${PORT}/api-docs/` : ` ${process.env.RENDER_EXTERNAL_URL}/api-docs/`}`);
   });
 
   // Graceful Shutdown

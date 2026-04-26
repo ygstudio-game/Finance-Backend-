@@ -20,8 +20,8 @@ Now you can click **"Try it out"** on any endpoint!
     },
     servers: [
       {
-        url: process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000',
-        description: process.env.RENDER_EXTERNAL_URL ? 'Production Server' : 'Local Development Server',
+        url: (process.env.NODE_ENV === "development") ? 'http://localhost:5000' : process.env.RENDER_EXTERNAL_URL,
+        description: process.env.NODE_ENV === "development" ? 'Local Development Server' : 'Production Server',
       },
     ],
     components: {

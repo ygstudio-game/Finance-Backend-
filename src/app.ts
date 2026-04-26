@@ -42,7 +42,7 @@ app.use(express.json());
 app.get('/', (req: Request, res: Response) => {
   res.status(200).json({
     success: true,
-    message: 'go to http://localhost:5000/api-docs/ for api Documentation',
+    message: `go to ${req.protocol}://${req.get('host')}/api-docs/ for api Documentation`,
     timestamp: new Date().toISOString(),
   });
 });
